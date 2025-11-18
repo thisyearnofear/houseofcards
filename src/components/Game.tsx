@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import React, { useEffect, useRef } from 'react'
 
 declare global {
   var Physijs: any
@@ -13,7 +13,65 @@ declare global {
   }
 }
 
+import GameUI, { GameState, Player } from './GameUI'
+
+import { useGameContract } from '../hooks/useGameContract'
+
 export default function Game() {
+  // Contract Hooks
+  const {
+    gameStateData,
+    joinGame: contractJoin,
+    reload: contractReload,
+    isPending,
+    isConfirming
+  } = useGameContract()
+
+  // Game State (Hybrid: Contract + Local Mock)
+  const [gameState, setGameState] = React.useState<GameState>('WAITING')
+  const [potSize, setPotSize] = React.useState(0)
+  const [timeLeft, setTimeLeft] = React.useState(30)
+  const [players, setPlayers] = React.useState<Player[]>([
+    { id: '1', address: '0x1234...7890', isAlive: true, isCurrentTurn: false },
+    { id: '2', address: '0xabcd...abcd', isAlive: true, isCurrentTurn: false },
+  ])
+  const [currentPlayerId, setCurrentPlayerId] = React.useState<string | undefined>()
+  const [fallenCount, setFallenCount] = React.useState(0)
+  const [isSpectator, setIsSpectator] = React.useState(false)
+
+  // Game Settings (Default)
+  const [settings, setSettings] = React.useState({
+    collapseThreshold: 0.4, // 40%
+    difficulty: 'MEDIUM'
+  })
+
+  // Sync Contract Data
+  useEffect(() => {
+    if (gameStateData) {
+      // Map contract state to local state
+      // Note: This is where you'd parse the BigInts from the contract
+      // For now, we just log it to show it's working
+      console.log('Contract State:', gameStateData)
+    }
+  }, [gameStateData])
+
+  // Timer Logic
+  useEffect(() => {
+    let interval: NodeJS.Timeout
+    if (gameState === 'ACTIVE' && timeLeft > 0) {
+      interval = setInterval(() => {
+        setTimeLeft((prev) => {
+          if (prev <= 1) {
+            // Turn over logic would go here
+            return 30 // Reset for next turn (mock)
+          }
+          return prev - 1
+        })
+      }, 1000)
+    }
+    return () => clearInterval(interval)
+  }, [gameState, timeLeft])
+
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -123,6 +181,28 @@ export default function Game() {
     scene.setGravity(new THREE.Vector3(0, -30, 0))
 
     scene.addEventListener('update', function () {
+      // Collapse Detection
+      let fallen = 0
+      const totalBlocks = blocks.length
+
+      for (let i = 0; i < totalBlocks; i++) {
+        // If block falls below the table surface (y < 0.5)
+        if (blocks[i].position.y < 0.5) {
+          fallen++
+        }
+      }
+
+      // Update React state (throttled)
+      if (Math.random() < 0.1) { // Only update 10% of frames to save React renders
+        setFallenCount(fallen)
+
+        // Check Threshold
+        if (fallen / totalBlocks >= settings.collapseThreshold && gameState === 'ACTIVE') {
+          // Trigger Collapse
+          setGameState('VOTING')
+        }
+      }
+
       if (selected_block !== null) {
         const _v3 = new THREE.Vector3()
         _v3.copy(mouse_position).add(block_offset).sub(selected_block.position).multiplyScalar(5)
@@ -270,10 +350,32 @@ export default function Game() {
     }
 
 
-    const handleMouseDown = function (evt: MouseEvent) {
+    const getEventPos = (evt: MouseEvent | TouchEvent) => {
+      let clientX, clientY
+      if ((evt as TouchEvent).changedTouches && (evt as TouchEvent).changedTouches.length > 0) {
+        clientX = (evt as TouchEvent).changedTouches[0].clientX
+        clientY = (evt as TouchEvent).changedTouches[0].clientY
+      } else {
+        clientX = (evt as MouseEvent).clientX
+        clientY = (evt as MouseEvent).clientY
+      }
+      return { clientX, clientY }
+    }
+
+    const handleInputStart = function (evt: MouseEvent | TouchEvent) {
+      // Spectator Check
+      if (isSpectator || gameState !== 'ACTIVE') return
+
+      // Prevent default to stop scrolling on touch devices
+      if (evt.type === 'touchstart') {
+        evt.preventDefault()
+      }
+
+      const { clientX, clientY } = getEventPos(evt)
+
       const vector = new THREE.Vector3(
-        (evt.clientX / window.innerWidth) * 2 - 1,
-        -(evt.clientY / window.innerHeight) * 2 + 1,
+        (clientX / window.innerWidth) * 2 - 1,
+        -(clientY / window.innerHeight) * 2 + 1,
         1
       )
 
@@ -298,11 +400,18 @@ export default function Game() {
       }
     }
 
-    const handleMouseMove = function (evt: MouseEvent) {
+    const handleInputMove = function (evt: MouseEvent | TouchEvent) {
+      // Prevent default to stop scrolling on touch devices
+      if (evt.type === 'touchmove') {
+        evt.preventDefault()
+      }
+
       if (selected_block !== null) {
+        const { clientX, clientY } = getEventPos(evt)
+
         const vector = new THREE.Vector3(
-          (evt.clientX / window.innerWidth) * 2 - 1,
-          -(evt.clientY / window.innerHeight) * 2 + 1,
+          (clientX / window.innerWidth) * 2 - 1,
+          -(clientY / window.innerHeight) * 2 + 1,
           1
         )
         vector.unproject(camera)
@@ -315,7 +424,7 @@ export default function Game() {
       }
     }
 
-    const handleMouseUp = function () {
+    const handleInputEnd = function (evt: MouseEvent | TouchEvent) {
       if (selected_block !== null) {
         const _vector_one = new THREE.Vector3(1, 1, 1)
         selected_block.setAngularFactor(_vector_one)
@@ -325,21 +434,72 @@ export default function Game() {
       }
     }
 
-    renderer.domElement.addEventListener('mousedown', handleMouseDown)
-    renderer.domElement.addEventListener('mousemove', handleMouseMove)
-    renderer.domElement.addEventListener('mouseup', handleMouseUp)
+    // Mouse events
+    renderer.domElement.addEventListener('mousedown', handleInputStart)
+    renderer.domElement.addEventListener('mousemove', handleInputMove)
+    renderer.domElement.addEventListener('mouseup', handleInputEnd)
+
+    // Touch events
+    renderer.domElement.addEventListener('touchstart', handleInputStart, { passive: false })
+    renderer.domElement.addEventListener('touchmove', handleInputMove, { passive: false })
+    renderer.domElement.addEventListener('touchend', handleInputEnd)
   }
 
   return (
     <div className="relative w-full h-screen bg-zinc-900">
-      {/* Reset Button */}
-      <button
-        onClick={() => resetTower()}
-        className="absolute bottom-6 right-6 z-50 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg backdrop-blur-sm transition-colors duration-200 border border-white/20"
-        style={{ pointerEvents: 'auto' }}
-      >
-        Reset Tower
-      </button>
+      {/* Game UI Overlay */}
+      <GameUI
+        gameState={gameState}
+        potSize={potSize}
+        timeLeft={timeLeft}
+        players={players}
+        currentPlayerId={currentPlayerId}
+        fallenCount={fallenCount}
+        totalBlocks={16 * 3} // 48 blocks
+        onJoin={() => {
+          // Try contract first, fallback to mock
+          try {
+            contractJoin()
+          } catch (e) {
+            console.error(e)
+          }
+
+          // Mock update for immediate feedback
+          setGameState('ACTIVE')
+          setPotSize(prev => prev + 1)
+          setPlayers(prev => [
+            ...prev,
+            { id: 'me', address: '0xMe', isAlive: true, isCurrentTurn: true }
+          ])
+          setCurrentPlayerId('me')
+          setIsSpectator(false)
+        }}
+        onReload={() => {
+          contractReload()
+          setPotSize(prev => prev + 1)
+        }}
+        onVote={(split) => {
+          alert(`Voted to ${split ? 'Split' : 'Continue'}`)
+          // Reset for next round
+          setGameState('ACTIVE')
+          setFallenCount(0)
+          resetTower()
+        }}
+      />
+
+      {/* Spectator Label */}
+      {isSpectator && (
+        <div className="absolute top-20 right-6 bg-yellow-500/20 text-yellow-200 px-3 py-1 rounded-full text-xs font-bold border border-yellow-500/50 backdrop-blur-sm">
+          SPECTATOR MODE
+        </div>
+      )}
+
+      {/* Transaction Status Indicator */}
+      {(isPending || isConfirming) && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 bg-blue-600 text-white px-4 py-2 rounded-full shadow-lg animate-pulse">
+          {isPending ? 'Check Wallet...' : 'Confirming Transaction...'}
+        </div>
+      )}
 
       {/* Game Canvas Container */}
       <div ref={containerRef} className="w-full h-full" style={{ pointerEvents: 'auto' }}>

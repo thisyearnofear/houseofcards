@@ -4,14 +4,14 @@ import '@rainbow-me/rainbowkit/styles.css'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RainbowKitProvider, getDefaultConfig } from '@rainbow-me/rainbowkit'
 import { WagmiProvider } from 'wagmi'
-import { sepolia, mainnet } from 'wagmi/chains'
+import { sepolia, mainnet, lineaSepolia } from 'wagmi/chains'
 
 const queryClient = new QueryClient()
 
 const config = getDefaultConfig({
-  appName: 'Web3 Jenga',
+  appName: 'House of Cards',
   projectId: 'demo-project-id', // Replace with your WalletConnect project ID
-  chains: [sepolia, mainnet],
+  chains: [lineaSepolia, sepolia, mainnet],
   ssr: true,
 })
 
