@@ -27,6 +27,10 @@ interface GameState {
     players: string[];
     currentPlayer: string | null;
     status: 'WAITING' | 'ACTIVE' | 'ENDED';
+    maxPlayers: number;
+    difficulty: 'EASY' | 'MEDIUM' | 'HARD';
+    stake: number;
+    isPractice: boolean;
     // Physics state would go here
 }
 
@@ -34,7 +38,11 @@ let currentGameState: GameState = {
     id: 0,
     players: [],
     currentPlayer: null,
-    status: 'WAITING'
+    status: 'WAITING',
+    maxPlayers: 7,
+    difficulty: 'MEDIUM',
+    stake: 1,
+    isPractice: false
 };
 
 // Initialize Blockchain Service
@@ -95,6 +103,25 @@ io.on('connection', (socket) => {
 
     socket.on('disconnect', () => {
         console.log('Client disconnected:', socket.id);
+    });
+
+    // Handle Game Creation with Settings
+    socket.on('createGame', (config: { maxPlayers: number; difficulty: string; stake: number; isPractice: boolean }) => {
+        console.log('Creating game with config:', config);
+        
+        currentGameState = {
+            id: Date.now(),
+            players: [],
+            currentPlayer: null,
+            status: 'WAITING',
+            maxPlayers: config.maxPlayers,
+            difficulty: config.difficulty as 'EASY' | 'MEDIUM' | 'HARD',
+            stake: config.stake,
+            isPractice: config.isPractice
+        };
+
+        // Broadcast new game state
+        io.emit('gameState', currentGameState);
     });
 
     // Handle Physics Moves

@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Web3 Jenga - House of Cards",
+  title: "Inverse Jenga - House of Cards",
   description: "Interactive Web3 Jenga game with blockchain integration",
 };
 

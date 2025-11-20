@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useRef } from 'react'
+import { GameSettingsConfig } from './GameSettings'
 
 declare global {
   var Physijs: any
@@ -18,7 +19,12 @@ import GameUI, { GameState, Player } from './GameUI'
 import { useGameContract } from '../hooks/useGameContract'
 import { useGameSocket } from '../hooks/useGameSocket'
 
-export default function Game() {
+interface GameProps {
+  settings: GameSettingsConfig
+  onReset?: () => void
+}
+
+export default function Game({ settings, onReset }: GameProps) {
   // Contract Hooks
   const {
     gameStateData,
@@ -29,29 +35,53 @@ export default function Game() {
   } = useGameContract()
 
   // WebSocket Hook
-  const { socket, gameState: serverState, isConnected, submitMove } = useGameSocket()
+  const { socket, gameState: serverState, isConnected, submitMove } = useGameSocket(settings)
 
-  // Derived State from Server
-  const gameState = serverState?.status || 'WAITING'
-  const players = serverState?.players.map((addr: string) => ({
-    id: addr,
-    address: addr,
-    isAlive: true, // TODO: Add to server state
-    isCurrentTurn: addr === serverState.currentPlayer
-  })) || []
-  const currentPlayerId = serverState?.currentPlayer || undefined
+  // Derived State from Server and Game Mode
+  const gameState = settings.gameMode === 'SOLO_PRACTICE' ? 'ACTIVE' : (serverState?.status || 'WAITING')
+  
+  // Handle different game modes
+  const players = React.useMemo(() => {
+    if (settings.gameMode === 'SOLO_PRACTICE') {
+      return [{
+        id: 'solo-player',
+        address: 'You',
+        isAlive: true,
+        isCurrentTurn: true
+      }]
+    } else if (settings.gameMode === 'SINGLE_VS_AI') {
+      const aiPlayers = Array.from({ length: settings.aiOpponentCount || 1 }, (_, i) => ({
+        id: `ai-${i}`,
+        address: `AI ${i + 1}`,
+        isAlive: true,
+        isCurrentTurn: false // Will be handled by server
+      }))
+      return [{
+        id: 'human-player',
+        address: 'You',
+        isAlive: true,
+        isCurrentTurn: true
+      }, ...aiPlayers]
+    } else {
+      // MULTIPLAYER
+      return serverState?.players.map((addr: string) => ({
+        id: addr,
+        address: addr,
+        isAlive: true, // TODO: Add to server state
+        isCurrentTurn: addr === serverState.currentPlayer
+      })) || []
+    }
+  }, [settings, serverState])
+  
+  const currentPlayerId = settings.gameMode === 'SOLO_PRACTICE' ? 'solo-player' : 
+                         settings.gameMode === 'SINGLE_VS_AI' ? 'human-player' :
+                         serverState?.currentPlayer || undefined
 
   // Local Visual State
   const [potSize, setPotSize] = React.useState(0) // TODO: Sync with contract
   const [timeLeft, setTimeLeft] = React.useState(30)
   const [fallenCount, setFallenCount] = React.useState(0)
   const [isSpectator, setIsSpectator] = React.useState(false)
-
-  // Game Settings (Default)
-  const [settings, setSettings] = React.useState({
-    collapseThreshold: 0.4, // 40%
-    difficulty: 'MEDIUM'
-  })
 
   // Sync Contract Data
   useEffect(() => {
@@ -111,15 +141,18 @@ export default function Game() {
 
         // Set physijs configurations
         if (window.Physijs) {
+          console.log('Physijs loaded successfully, configuring...')
           window.Physijs.scripts.worker = '/js/physijs_worker.js'
           window.Physijs.scripts.ammo = '/js/ammo.js'
 
           // Check if worker file exists
           fetch(window.Physijs.scripts.worker)
+            .then(() => console.log('Worker file loaded'))
             .catch(err => console.error('Worker file access error:', err))
 
           // Check if ammo.js file exists
           fetch(window.Physijs.scripts.ammo)
+            .then(() => console.log('Ammo.js loaded'))
             .catch(err => console.error('Ammo.js file access error:', err))
         } else {
           console.error('Physijs is not available')
@@ -130,10 +163,14 @@ export default function Game() {
 
         // Handle window resize
         const handleResize = () => {
-          if (renderer && camera) {
-            camera.aspect = window.innerWidth / window.innerHeight
+          if (renderer && camera && containerRef.current) {
+            const rect = containerRef.current.getBoundingClientRect()
+            const width = rect.width
+            const height = rect.height
+            
+            camera.aspect = width / height
             camera.updateProjectionMatrix()
-            renderer.setSize(window.innerWidth, window.innerHeight)
+            renderer.setSize(width, height)
           }
         }
 
@@ -186,33 +223,57 @@ export default function Game() {
     blocksRef.current = []
     const blocks = blocksRef.current
 
+    // Get the actual container dimensions
+    const container = containerRef.current
+    if (!container) {
+      console.error('Container ref not available')
+      return
+    }
+
+    const containerRect = container.getBoundingClientRect()
+    const width = containerRect.width
+    const height = containerRect.height
+
+    console.log('Container dimensions:', width, 'x', height)
+
     renderer = new THREE.WebGLRenderer({ antialias: true })
-    renderer.setSize(window.innerWidth, window.innerHeight)
+    renderer.setSize(width, height)
     renderer.setClearColor(0x2c3e50)
     renderer.shadowMap.enabled = true
     renderer.shadowMapSoft = true
     // Ensure the canvas can receive mouse events
     renderer.domElement.style.pointerEvents = 'auto'
-    containerRef.current?.appendChild(renderer.domElement)
+    container.appendChild(renderer.domElement)
 
     scene = new Physijs.Scene({ fixedTimeStep: 1 / 120 })
     scene.setGravity(new THREE.Vector3(0, -30, 0))
+    console.log('Physijs scene created, game mode:', settings.gameMode)
 
     // Physics Sync moved to top level component
 
 
     scene.addEventListener('update', function () {
-      // Local physics loop removed. We rely on server updates.
-      // We can keep this for client-side prediction later if needed.
+      // For solo practice mode, we handle local physics
+      // For server modes, we rely on server updates
+      if (settings.gameMode === 'SOLO_PRACTICE') {
+        // Continue local physics simulation
+        // console.log('Physics update tick')
+        scene.simulate()
+      }
     })
 
     // Start Render Loop
     requestAnimationFrame(render)
-    // scene.simulate() // DISABLED: Server is authoritative
+    
+    // Enable physics simulation based on game mode
+    if (settings.gameMode === 'SOLO_PRACTICE') {
+      console.log('Starting local physics simulation for solo practice')
+      scene.simulate()
+    }
 
     camera = new THREE.PerspectiveCamera(
       35,
-      window.innerWidth / window.innerHeight,
+      width / height,
       1,
       1000
     )
@@ -292,7 +353,7 @@ export default function Game() {
     }, 0)
 
     requestAnimationFrame(render)
-    scene.simulate()
+    // Physics simulation is handled by the update event listener
   }
 
   const render = function () {
@@ -384,7 +445,7 @@ export default function Game() {
     }
 
     const handleInputEnd = function (evt: MouseEvent | TouchEvent) {
-      if (selected_block !== null && socketRef.current) {
+      if (selected_block !== null) {
         // Calculate force vector based on drag or just a simple push
         // For MVP: Apply a fixed force in the direction of the camera view or towards center
 
@@ -394,7 +455,12 @@ export default function Game() {
 
         const blockIndex = blocksRef.current.indexOf(selected_block)
 
-        if (blockIndex !== -1) {
+        if (settings.gameMode === 'SOLO_PRACTICE') {
+          // Local physics for solo practice
+          selected_block.applyCentralForce(force)
+          console.log('Applied local force:', blockIndex, force)
+        } else if (socketRef.current && blockIndex !== -1) {
+          // Send to server for other modes
           console.log('Sending Move:', blockIndex, force)
           socketRef.current.emit('submitMove', {
             blockIndex: blockIndex,
@@ -446,7 +512,7 @@ export default function Game() {
   }
 
   return (
-    <div className="relative w-full h-screen bg-zinc-900">
+    <div className="relative w-full h-full">
       {/* Game UI Overlay */}
       <GameUI
         gameState={gameState}
@@ -455,7 +521,12 @@ export default function Game() {
         players={players}
         currentPlayerId={currentPlayerId}
         fallenCount={fallenCount}
-        totalBlocks={16 * 3} // 48 blocks
+        totalBlocks={16 * 3}
+        maxPlayers={settings.gameMode === 'MULTIPLAYER' ? settings.playerCount : 
+                   settings.gameMode === 'SINGLE_VS_AI' ? (settings.aiOpponentCount || 1) + 1 : 1}
+        difficulty={settings.difficulty}
+        stake={settings.stake}
+        isPractice={settings.gameMode === 'SOLO_PRACTICE'}
         onJoin={() => {
           // Try contract first, fallback to mock
           try {
@@ -466,8 +537,12 @@ export default function Game() {
           // Server will update state via WebSocket
         }}
         onReload={() => {
-          contractReload()
-          setPotSize(prev => prev + 1)
+          if (settings.gameMode === 'SOLO_PRACTICE') {
+            resetTower()
+          } else {
+            contractReload()
+            setPotSize(prev => prev + 1)
+          }
         }}
         onVote={(split) => {
           alert(`Voted to ${split ? 'Split' : 'Continue'}`)
@@ -490,7 +565,7 @@ export default function Game() {
       )}
 
       {/* Game Canvas Container */}
-      <div ref={containerRef} className="w-full h-full" style={{ pointerEvents: 'auto' }}>
+      <div ref={containerRef} className="w-full h-full bg-gradient-to-br from-slate-900 via-slate-800 to-black" style={{ pointerEvents: 'auto' }}>
         {/* Canvas will be appended here by initScene */}
       </div>
     </div>

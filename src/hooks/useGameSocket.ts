@@ -10,7 +10,15 @@ export interface GameState {
     status: 'WAITING' | 'ACTIVE' | 'ENDED';
 }
 
-export function useGameSocket() {
+export interface GameSettingsConfig {
+    gameMode: 'SOLO_PRACTICE' | 'SINGLE_VS_AI' | 'MULTIPLAYER'
+    playerCount: number
+    aiOpponentCount?: number
+    difficulty: 'EASY' | 'MEDIUM' | 'HARD'
+    stake: number
+}
+
+export function useGameSocket(settings?: GameSettingsConfig) {
     const [socket, setSocket] = useState<Socket | null>(null);
     const [isConnected, setIsConnected] = useState(false);
     const [gameState, setGameState] = useState<GameState | null>(null);
@@ -19,6 +27,15 @@ export function useGameSocket() {
     const socketRef = useRef<Socket | null>(null);
 
     useEffect(() => {
+        // Don't connect to server for solo practice mode
+        if (settings?.gameMode === 'SOLO_PRACTICE') {
+            console.log('Solo Practice Mode: Skipping server connection');
+            setSocket(null);
+            setIsConnected(false);
+            setGameState(null);
+            return;
+        }
+
         if (socketRef.current) return;
 
         console.log('Connecting to Game Server:', SERVER_URL);
@@ -33,6 +50,17 @@ export function useGameSocket() {
         newSocket.on('connect', () => {
             console.log('Socket Connected:', newSocket.id);
             setIsConnected(true);
+
+            if (settings) {
+                // Only create game on server for non-practice modes
+                newSocket.emit('createGame', {
+                    gameMode: settings.gameMode,
+                    maxPlayers: settings.gameMode === 'MULTIPLAYER' ? settings.playerCount : (settings.aiOpponentCount || 1) + 1,
+                    difficulty: settings.difficulty,
+                    stake: settings.stake,
+                    aiOpponentCount: settings.aiOpponentCount
+                });
+            }
         });
 
         newSocket.on('disconnect', () => {
@@ -53,7 +81,7 @@ export function useGameSocket() {
                 socketRef.current = null;
             }
         };
-    }, []);
+    }, [settings]);
 
     const submitMove = (moveData: any) => {
         if (socket) {

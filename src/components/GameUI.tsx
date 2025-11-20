@@ -18,6 +18,10 @@ interface GameUIProps {
     currentPlayerId?: string
     fallenCount?: number
     totalBlocks?: number
+    maxPlayers?: number
+    difficulty?: string
+    stake?: number
+    isPractice?: boolean
     onJoin: () => void
     onReload: () => void
     onVote: (split: boolean) => void
@@ -31,6 +35,10 @@ export default function GameUI({
     currentPlayerId,
     fallenCount = 0,
     totalBlocks = 48,
+    maxPlayers = 7,
+    difficulty = 'MEDIUM',
+    stake = 1,
+    isPractice = false,
     onJoin,
     onReload,
     onVote
@@ -51,9 +59,6 @@ export default function GameUI({
                     <div className="bg-black/40 backdrop-blur-md border border-white/10 rounded-xl p-4 text-white">
                         <div className="text-xs text-gray-400 uppercase tracking-wider font-bold">Pot Size</div>
                         <div className="text-2xl font-mono text-green-400">${potSize.toFixed(2)} USDC</div>
-                    </div>
-                    <div className="hidden md:block">
-                        <ConnectButton />
                     </div>
                 </div>
 
@@ -105,7 +110,15 @@ export default function GameUI({
 
                 {/* Player List */}
                 <div className="bg-black/40 backdrop-blur-md border border-white/10 rounded-xl p-4 text-white w-full md:w-64 max-h-48 overflow-y-auto">
-                    <div className="text-xs text-gray-400 uppercase tracking-wider font-bold mb-2">Players ({players.length}/7)</div>
+                    <div className="text-xs text-gray-400 uppercase tracking-wider font-bold mb-2">
+                        Players ({players.length}/{maxPlayers})
+                        {!isPractice && (
+                            <span className="text-white ml-2">• {difficulty} • {stake} USDC</span>
+                        )}
+                        {isPractice && (
+                            <span className="text-purple-400 ml-2">• Practice Mode</span>
+                        )}
+                    </div>
                     <div className="space-y-2">
                         {players.map((player) => (
                             <div
@@ -128,13 +141,17 @@ export default function GameUI({
                     {gameState === 'WAITING' && (
                         <div className="flex flex-col gap-2 items-end">
                             <div className="text-xs text-gray-400 bg-black/40 p-2 rounded mb-2">
-                                Creator Settings: <span className="text-white">Medium Difficulty • 1 USDC Stake</span>
+                                {isPractice ? (
+                                    <>Creator Settings: <span className="text-purple-400">Practice Mode • No Stake</span></>
+                                ) : (
+                                    <>Creator Settings: <span className="text-white">{difficulty} • {stake} USDC</span></>
+                                )}
                             </div>
                             <button
                                 onClick={onJoin}
                                 className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-xl font-bold shadow-lg shadow-blue-900/20 transition-all active:scale-95"
                             >
-                                Join Game (1 USDC)
+                                {isPractice ? 'Join Practice' : `Join Game (${stake} USDC)`}
                             </button>
                         </div>
                     )}
@@ -144,7 +161,7 @@ export default function GameUI({
                             onClick={onReload}
                             className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-4 rounded-xl font-bold shadow-lg shadow-purple-900/20 transition-all active:scale-95"
                         >
-                            Reload Stack
+                            {isPractice ? 'Reset Tower' : 'Reload Stack'}
                         </button>
                     )}
 
