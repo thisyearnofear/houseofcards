@@ -318,33 +318,25 @@ export default function Game({ settings, onReset, onExit }: GameProps) {
 
         // Competitor Mode Logic: Scoring and Collapse
         if (settings.gameMode === 'SOLO_COMPETITOR' && !gameOver) {
-          let groundBlocks = 0
-
-          blocksRef.current.forEach((block, index) => {
-            // Check Scoring: Block moved far from center
+          blocksRef.current.forEach((block) => {
+            // Check Scoring: Block moved far from center (removed from tower)
             const dist = Math.sqrt(block.position.x * block.position.x + block.position.z * block.position.z)
 
-            if (dist > 8 && !scoredBlocksRef.current.has(block.id)) {
+            if (dist > 10 && !scoredBlocksRef.current.has(block.id)) {
               scoredBlocksRef.current.add(block.id)
               setScore(prev => prev + 1)
               setTimeLeft(30) // Reset timer
-
-              // Optional: Make scored block disappear or ghost
-              // block.visible = false // Or just leave it as debris
             }
 
-            // Check Collapse: Block near ground but inside tower area
-            if (block.position.y < 2 && dist < 6) {
-              groundBlocks++
+            // Check Collapse:
+            // We monitor the "Locked" blocks (the top 2 layers, 14 and 15).
+            // Since the user cannot move these, if they fall significantly, the tower has collapsed.
+            // Layer 14 starts at y=14.5. If it falls below y=12, it's a collapse.
+            if (block.userData?.isLocked && block.position.y < 12) {
+              console.log('Collapse detected! Top layer fell.')
+              setGameOver(true)
             }
           })
-
-          // Base has 3 blocks. If > 5 blocks are near ground inside tower area, it's a collapse
-          // (Allowing a couple of loose blocks to fall without ending game immediately, but 5 is safe threshold)
-          if (groundBlocks > 5) {
-            console.log('Collapse detected! Ground blocks:', groundBlocks)
-            setGameOver(true)
-          }
         }
       }
     })
