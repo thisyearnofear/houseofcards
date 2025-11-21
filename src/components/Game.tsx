@@ -39,7 +39,7 @@ export default function Game({ settings, onReset }: GameProps) {
 
   // Derived State from Server and Game Mode
   const gameState = settings.gameMode === 'SOLO_PRACTICE' ? 'ACTIVE' : (serverState?.status || 'WAITING')
-  
+
   // Handle different game modes
   const players = React.useMemo(() => {
     if (settings.gameMode === 'SOLO_PRACTICE') {
@@ -72,10 +72,10 @@ export default function Game({ settings, onReset }: GameProps) {
       })) || []
     }
   }, [settings, serverState])
-  
-  const currentPlayerId = settings.gameMode === 'SOLO_PRACTICE' ? 'solo-player' : 
-                         settings.gameMode === 'SINGLE_VS_AI' ? 'human-player' :
-                         serverState?.currentPlayer || undefined
+
+  const currentPlayerId = settings.gameMode === 'SOLO_PRACTICE' ? 'solo-player' :
+    settings.gameMode === 'SINGLE_VS_AI' ? 'human-player' :
+      serverState?.currentPlayer || undefined
 
   // Local Visual State
   const [potSize, setPotSize] = React.useState(0) // TODO: Sync with contract
@@ -187,7 +187,7 @@ export default function Game({ settings, onReset }: GameProps) {
             const rect = containerRef.current.getBoundingClientRect()
             const width = rect.width
             const height = rect.height
-            
+
             camera.aspect = width / height
             camera.updateProjectionMatrix()
             renderer.setSize(width, height)
@@ -238,6 +238,15 @@ export default function Game({ settings, onReset }: GameProps) {
     selected_block: any = null,
     mouse_position: any,
     block_offset: any
+
+  const getPhysicsConfig = (difficulty: 'EASY' | 'MEDIUM' | 'HARD') => {
+    switch (difficulty) {
+      case 'EASY': return { friction: 0.8, restitution: 0.1, mass: 2.0, damping: 0.1 }
+      case 'MEDIUM': return { friction: 0.5, restitution: 0.3, mass: 1.0, damping: 0.05 }
+      case 'HARD': return { friction: 0.2, restitution: 0.5, mass: 0.5, damping: 0.01 }
+      default: return { friction: 0.5, restitution: 0.3, mass: 1.0, damping: 0.05 }
+    }
+  }
 
   const initScene = function () {
     mouse_position = new THREE.Vector3(0, 0, 0)
@@ -293,7 +302,7 @@ export default function Game({ settings, onReset }: GameProps) {
 
     // Start Render Loop
     requestAnimationFrame(render)
-    
+
     // Enable physics simulation based on game mode
     if (settings.gameMode === 'SOLO_PRACTICE') {
       console.log('Starting local physics simulation for solo practice')
@@ -332,6 +341,8 @@ export default function Game({ settings, onReset }: GameProps) {
     // Loader
     loader = new THREE.TextureLoader()
 
+    const physicsConfig = getPhysicsConfig(settings.difficulty)
+
     // Materials
     const woodTexture = loader.load('/images/wood.jpg', undefined, undefined, (err: any) => {
       console.error('Error loading wood texture:', err)
@@ -339,8 +350,8 @@ export default function Game({ settings, onReset }: GameProps) {
 
     table_material = Physijs.createMaterial(
       new THREE.MeshLambertMaterial({ map: woodTexture }),
-      .9, // friction
-      .2 // restitution
+      physicsConfig.friction, // friction
+      physicsConfig.restitution // restitution
     )
     table_material.map.wrapS = table_material.map.wrapT = THREE.RepeatWrapping
     table_material.map.repeat.set(5, 5)
@@ -350,8 +361,8 @@ export default function Game({ settings, onReset }: GameProps) {
     })
     block_material = Physijs.createMaterial(
       new THREE.MeshLambertMaterial({ map: plywoodTexture }),
-      .4, // friction
-      .4 // restitution
+      physicsConfig.friction, // friction
+      physicsConfig.restitution // restitution
     )
     block_material.map.wrapS = block_material.map.wrapT = THREE.RepeatWrapping
     block_material.map.repeat.set(1, .5)
@@ -361,7 +372,7 @@ export default function Game({ settings, onReset }: GameProps) {
       new THREE.BoxGeometry(50, 1, 50),
       table_material,
       0, // mass
-      { restitution: .2, friction: .8 }
+      { restitution: physicsConfig.restitution, friction: physicsConfig.friction }
     )
     table.position.y = -.5
     table.receiveShadow = true
@@ -398,9 +409,11 @@ export default function Game({ settings, onReset }: GameProps) {
       return
     }
 
+    const physicsConfig = getPhysicsConfig(settings.difficulty)
+
     for (let i = 0; i < 16; i++) {
       for (let j = 0; j < 3; j++) {
-        const block = new Physijs.BoxMesh(block_geometry, block_material)
+        const block = new Physijs.BoxMesh(block_geometry, block_material, physicsConfig.mass)
         block.position.y = (block_height / 2) + block_height * i
         if (i % 2 === 0) {
           block.rotation.y = Math.PI / 2.01
@@ -410,6 +423,10 @@ export default function Game({ settings, onReset }: GameProps) {
         }
         block.receiveShadow = true
         block.castShadow = true
+
+        // Apply damping
+        block.setDamping(physicsConfig.damping, physicsConfig.damping)
+
         sc.add(block)
         blocksRef.current.push(block)
       }
@@ -565,8 +582,8 @@ export default function Game({ settings, onReset }: GameProps) {
         currentPlayerId={currentPlayerId}
         fallenCount={fallenCount}
         totalBlocks={16 * 3}
-        maxPlayers={settings.gameMode === 'MULTIPLAYER' ? settings.playerCount : 
-                   settings.gameMode === 'SINGLE_VS_AI' ? (settings.aiOpponentCount || 1) + 1 : 1}
+        maxPlayers={settings.gameMode === 'MULTIPLAYER' ? settings.playerCount :
+          settings.gameMode === 'SINGLE_VS_AI' ? (settings.aiOpponentCount || 1) + 1 : 1}
         difficulty={settings.difficulty}
         stake={settings.stake}
         isPractice={settings.gameMode === 'SOLO_PRACTICE'}

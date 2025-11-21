@@ -73,7 +73,7 @@ blockchain.listenToEvents({
 });
 
 // Initialize Physics
-const physics = new PhysicsWorld();
+let physics = new PhysicsWorld('MEDIUM');
 
 // Physics Loop (60 FPS)
 setInterval(() => {
@@ -108,7 +108,7 @@ io.on('connection', (socket) => {
     // Handle Game Creation with Settings
     socket.on('createGame', (config: { maxPlayers: number; difficulty: string; stake: number; isPractice: boolean }) => {
         console.log('Creating game with config:', config);
-        
+
         currentGameState = {
             id: Date.now(),
             players: [],
@@ -119,6 +119,9 @@ io.on('connection', (socket) => {
             stake: config.stake,
             isPractice: config.isPractice
         };
+
+        // Re-initialize physics with new difficulty
+        physics = new PhysicsWorld(currentGameState.difficulty);
 
         // Broadcast new game state
         io.emit('gameState', currentGameState);

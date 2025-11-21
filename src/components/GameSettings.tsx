@@ -54,6 +54,8 @@ export default function GameSettings({ onStart }: GameSettingsProps) {
     }
   }
 
+  const isProduction = process.env.NODE_ENV === 'production';
+
   return (
     <div className="w-full max-w-2xl">
       <div className="bg-black/40 backdrop-blur-md border border-white/10 rounded-2xl p-8">
@@ -67,24 +69,33 @@ export default function GameSettings({ onStart }: GameSettingsProps) {
           <label className="block text-white font-semibold mb-4">Game Mode</label>
           <div className="grid gap-3">
             {([
-              { key: 'SOLO_PRACTICE', title: 'Solo Practice', desc: 'Just you and the physics engine', icon: '🎯' },
-              { key: 'SINGLE_VS_AI', title: 'Single vs AI', desc: 'Challenge computer opponents', icon: '🤖' },
-              { key: 'MULTIPLAYER', title: 'Multiplayer', desc: 'Play with other humans', icon: '👥' }
+              { key: 'SOLO_PRACTICE', title: 'Solo Practice', desc: 'Just you and the physics engine', icon: '🎯', disabled: false },
+              { key: 'SINGLE_VS_AI', title: 'Single vs AI', desc: 'Challenge computer opponents', icon: '🤖', disabled: isProduction },
+              { key: 'MULTIPLAYER', title: 'Multiplayer', desc: 'Play with other humans', icon: '👥', disabled: isProduction }
             ] as const).map((mode) => (
               <button
                 key={mode.key}
-                onClick={() => setGameMode(mode.key as any)}
-                className={`p-4 rounded-lg border text-left transition-all ${
-                  gameMode === mode.key
+                disabled={mode.disabled}
+                onClick={() => !mode.disabled && setGameMode(mode.key as any)}
+                className={`p-4 rounded-lg border text-left transition-all relative overflow-hidden ${mode.disabled
+                  ? 'bg-white/5 border-white/5 text-gray-500 cursor-not-allowed opacity-60'
+                  : gameMode === mode.key
                     ? 'bg-gradient-to-r from-blue-600/20 to-purple-600/20 border-blue-500 text-white'
                     : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10'
-                }`}
+                  }`}
               >
                 <div className="flex items-center gap-3">
-                  <span className="text-2xl">{mode.icon}</span>
+                  <span className="text-2xl grayscale">{mode.icon}</span>
                   <div>
-                    <div className="font-semibold">{mode.title}</div>
-                    <div className="text-sm text-gray-400">{mode.desc}</div>
+                    <div className="font-semibold flex items-center gap-2">
+                      {mode.title}
+                      {mode.disabled && (
+                        <span className="text-[10px] uppercase tracking-wider bg-white/10 text-white/60 px-2 py-0.5 rounded-full">
+                          Coming Soon
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-sm text-gray-500">{mode.desc}</div>
                   </div>
                 </div>
               </button>
@@ -107,11 +118,10 @@ export default function GameSettings({ onStart }: GameSettingsProps) {
                     <button
                       key={count}
                       onClick={() => setAiOpponentCount(count)}
-                      className={`py-2 px-1 rounded-lg font-semibold transition-all ${
-                        aiOpponentCount === count
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-white/5 text-gray-300 hover:bg-white/10'
-                      }`}
+                      className={`py-2 px-1 rounded-lg font-semibold transition-all ${aiOpponentCount === count
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-white/5 text-gray-300 hover:bg-white/10'
+                        }`}
                     >
                       {count}
                     </button>
@@ -131,11 +141,10 @@ export default function GameSettings({ onStart }: GameSettingsProps) {
                     <button
                       key={count}
                       onClick={() => setPlayerCount(count)}
-                      className={`py-2 px-1 rounded-lg font-semibold transition-all ${
-                        playerCount === count
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-white/5 text-gray-300 hover:bg-white/10'
-                      }`}
+                      className={`py-2 px-1 rounded-lg font-semibold transition-all ${playerCount === count
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-white/5 text-gray-300 hover:bg-white/10'
+                        }`}
                     >
                       {count}
                     </button>
@@ -156,11 +165,10 @@ export default function GameSettings({ onStart }: GameSettingsProps) {
                     <button
                       key={amount}
                       onClick={() => setStake(amount)}
-                      className={`py-2 px-1 rounded-lg font-semibold text-sm transition-all ${
-                        stake === amount
-                          ? 'bg-green-600 text-white'
-                          : 'bg-white/5 text-gray-300 hover:bg-white/10'
-                      }`}
+                      className={`py-2 px-1 rounded-lg font-semibold text-sm transition-all ${stake === amount
+                        ? 'bg-green-600 text-white'
+                        : 'bg-white/5 text-gray-300 hover:bg-white/10'
+                        }`}
                     >
                       {amount}
                     </button>
@@ -177,11 +185,10 @@ export default function GameSettings({ onStart }: GameSettingsProps) {
                   <button
                     key={level}
                     onClick={() => setDifficulty(level)}
-                    className={`py-3 px-4 rounded-lg font-semibold transition-all ${
-                      difficulty === level
-                        ? 'bg-yellow-600 text-white'
-                        : 'bg-white/5 text-gray-300 hover:bg-white/10'
-                    }`}
+                    className={`py-3 px-4 rounded-lg font-semibold transition-all ${difficulty === level
+                      ? 'bg-yellow-600 text-white'
+                      : 'bg-white/5 text-gray-300 hover:bg-white/10'
+                      }`}
                   >
                     {level}
                   </button>
@@ -210,8 +217,8 @@ export default function GameSettings({ onStart }: GameSettingsProps) {
                   <>
                     <p>{difficulty} difficulty</p>
                     <p className="text-green-400 font-semibold">
-                      Total Pot: {gameMode === 'SINGLE_VS_AI' 
-                        ? (stake * (1 + aiOpponentCount)).toFixed(2) 
+                      Total Pot: {gameMode === 'SINGLE_VS_AI'
+                        ? (stake * (1 + aiOpponentCount)).toFixed(2)
                         : (stake * playerCount).toFixed(2)
                       } USDC
                     </p>

@@ -1,12 +1,48 @@
 import * as CANNON from 'cannon-es';
 
+export type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
+
+interface PhysicsConfig {
+    friction: number;
+    restitution: number;
+    linearDamping: number;
+    angularDamping: number;
+    mass: number;
+}
+
+const DIFFICULTY_CONFIGS: Record<Difficulty, PhysicsConfig> = {
+    EASY: {
+        friction: 0.8,
+        restitution: 0.1,
+        linearDamping: 0.1,
+        angularDamping: 0.1,
+        mass: 2.0
+    },
+    MEDIUM: {
+        friction: 0.5,
+        restitution: 0.3,
+        linearDamping: 0.05,
+        angularDamping: 0.05,
+        mass: 1.0
+    },
+    HARD: {
+        friction: 0.2,
+        restitution: 0.5,
+        linearDamping: 0.01,
+        angularDamping: 0.01,
+        mass: 0.5
+    }
+};
+
 export class PhysicsWorld {
     private world: CANNON.World;
     private blocks: CANNON.Body[] = [];
     private table: CANNON.Body;
     private ground: CANNON.Body;
+    private config: PhysicsConfig;
 
-    constructor() {
+    constructor(difficulty: Difficulty = 'MEDIUM') {
+        this.config = DIFFICULTY_CONFIGS[difficulty];
         this.world = new CANNON.World();
         this.world.gravity.set(0, -30, 0); // Match client gravity
         this.world.broadphase = new CANNON.NaiveBroadphase();
@@ -17,14 +53,14 @@ export class PhysicsWorld {
         const blockMaterial = new CANNON.Material('block');
 
         const tableBlockContact = new CANNON.ContactMaterial(tableMaterial, blockMaterial, {
-            friction: 0.9,
-            restitution: 0.2
+            friction: this.config.friction,
+            restitution: this.config.restitution
         });
         this.world.addContactMaterial(tableBlockContact);
 
         const blockBlockContact = new CANNON.ContactMaterial(blockMaterial, blockMaterial, {
-            friction: 0.4,
-            restitution: 0.4
+            friction: this.config.friction,
+            restitution: this.config.restitution
         });
         this.world.addContactMaterial(blockBlockContact);
 
@@ -61,7 +97,7 @@ export class PhysicsWorld {
         for (let i = 0; i < 16; i++) {
             for (let j = 0; j < 3; j++) {
                 const body = new CANNON.Body({
-                    mass: 1, // Dynamic
+                    mass: this.config.mass, // Dynamic
                     material: material
                 });
                 body.addShape(shape);
@@ -83,8 +119,8 @@ export class PhysicsWorld {
                 body.position.set(x, y, z);
 
                 // Damping to improve stability
-                body.linearDamping = 0.05;
-                body.angularDamping = 0.05;
+                body.linearDamping = this.config.linearDamping;
+                body.angularDamping = this.config.angularDamping;
 
                 this.world.addBody(body);
                 this.blocks.push(body);
