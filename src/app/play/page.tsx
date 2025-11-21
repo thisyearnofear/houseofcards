@@ -35,7 +35,12 @@ export default function PlayPage() {
             <GameSettings onStart={handleStartGame} />
           </div>
         ) : (
-          <Game key={gameKey} settings={gameSettings} onReset={handleResetGame} />
+          <Game 
+            key={gameKey} 
+            settings={gameSettings} 
+            onReset={handleResetGame} 
+            onExit={() => setGameSettings(null)}
+          />
         )}
       </main>
     </div>

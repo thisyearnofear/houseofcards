@@ -23,9 +23,10 @@ import { useLeaderboard } from '../hooks/useLeaderboard'
 interface GameProps {
   settings: GameSettingsConfig
   onReset?: () => void
+  onExit?: () => void
 }
 
-export default function Game({ settings, onReset }: GameProps) {
+export default function Game({ settings, onReset, onExit }: GameProps) {
   // Contract Hooks
   const {
     gameStateData,
@@ -694,6 +695,7 @@ export default function Game({ settings, onReset }: GameProps) {
           alert(`Voted to ${split ? 'Split' : 'Continue'}`)
           // TODO: Emit vote to server
         }}
+        onExit={onExit}
       />
 
       {/* Game Over Overlay for Competitor Mode */}
@@ -728,6 +730,14 @@ export default function Game({ settings, onReset }: GameProps) {
               >
                 Try Again
               </button>
+              {onExit && (
+                <button
+                  onClick={onExit}
+                  className="w-full bg-white/5 hover:bg-white/10 text-gray-300 font-semibold py-3 rounded-lg transition-colors"
+                >
+                  Exit to Menu
+                </button>
+              )}
             </div>
           </div>
         </div>

@@ -27,6 +27,7 @@ interface GameUIProps {
     onJoin: () => void
     onReload: () => void
     onVote: (split: boolean) => void
+    onExit?: () => void
 }
 
 export default function GameUI({
@@ -45,7 +46,8 @@ export default function GameUI({
     highScore = 0,
     onJoin,
     onReload,
-    onVote
+    onVote,
+    onExit
 }: GameUIProps) {
 
     const [scoreJuice, setScoreJuice] = React.useState(false)
@@ -72,6 +74,19 @@ export default function GameUI({
             {/* Top Bar: Pot & Status */}
             <div className="flex justify-between items-start pointer-events-auto">
                 <div className="flex gap-4">
+                    {onExit && (
+                        <button
+                            onClick={onExit}
+                            className="bg-black/40 backdrop-blur-md border border-white/10 rounded-xl p-4 text-white hover:bg-red-500/20 hover:border-red-500/50 transition-all group"
+                            title="Exit to Menu"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400 group-hover:text-red-400">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                                <polyline points="16 17 21 12 16 7" />
+                                <line x1="21" x2="9" y1="12" y2="12" />
+                            </svg>
+                        </button>
+                    )}
                     <div className="bg-black/40 backdrop-blur-md border border-white/10 rounded-xl p-4 text-white">
                         <div className="text-xs text-gray-400 uppercase tracking-wider font-bold">Pot Size</div>
                         <div className="text-2xl font-mono text-green-400">${potSize.toFixed(2)} USDC</div>
