@@ -18,6 +18,7 @@ import GameUI, { GameState, Player } from './GameUI'
 
 import { useGameContract } from '../hooks/useGameContract'
 import { useGameSocket } from '../hooks/useGameSocket'
+import { useLeaderboard } from '../hooks/useLeaderboard'
 
 interface GameProps {
   settings: GameSettingsConfig
@@ -36,6 +37,17 @@ export default function Game({ settings, onReset }: GameProps) {
 
   // WebSocket Hook
   const { socket, gameState: serverState, isConnected, physicsState, submitMove } = useGameSocket(settings)
+
+  // Leaderboard Hook
+  const {
+    submitScore,
+    highScore,
+    isPending: isSubmitting,
+    isConfirming: isConfirmingScore,
+    isConfirmed: isScoreConfirmed
+  } = useLeaderboard()
+
+
 
   // Derived State from Server and Game Mode
   const gameState = settings.gameMode === 'SOLO_PRACTICE' ? 'ACTIVE' : (serverState?.status || 'WAITING')
@@ -78,17 +90,17 @@ export default function Game({ settings, onReset }: GameProps) {
       serverState?.currentPlayer || undefined
 
   // Local Visual State
-  const [potSize, setPotSize] = React.useState(0) // TODO: Sync with contract
+  const [potSize, setPotSize] = React.useState(0)
   const [timeLeft, setTimeLeft] = React.useState(30)
   const [fallenCount, setFallenCount] = React.useState(0)
   const [isSpectator, setIsSpectator] = React.useState(false)
+  const [score, setScore] = React.useState(0)
+  const [gameOver, setGameOver] = React.useState(false)
+  const [gameWon, setGameWon] = React.useState(false)
 
   // Sync Contract Data
   useEffect(() => {
     if (gameStateData) {
-      // Map contract state to local state
-      // Note: This is where you'd parse the BigInts from the contract
-      // For now, we just log it to show it's working
       console.log('Contract State:', gameStateData)
     }
   }, [gameStateData])
@@ -96,19 +108,22 @@ export default function Game({ settings, onReset }: GameProps) {
   // Timer Logic
   useEffect(() => {
     let interval: NodeJS.Timeout
-    if (gameState === 'ACTIVE' && timeLeft > 0) {
+    if (gameState === 'ACTIVE' && !gameOver && !gameWon) {
       interval = setInterval(() => {
         setTimeLeft((prev) => {
           if (prev <= 1) {
-            // Turn over logic would go here
-            return 30 // Reset for next turn (mock)
+            if (settings.gameMode === 'SOLO_COMPETITOR') {
+              setGameOver(true)
+              return 0
+            }
+            return 30 // Reset for next turn (mock for other modes)
           }
           return prev - 1
         })
       }, 1000)
     }
     return () => clearInterval(interval)
-  }, [gameState, timeLeft])
+  }, [gameState, gameOver, gameWon, settings.gameMode, timeLeft])
 
   const containerRef = useRef<HTMLDivElement>(null)
   const socketRef = useRef<any>(null)
@@ -116,13 +131,14 @@ export default function Game({ settings, onReset }: GameProps) {
   const dragStartRef = useRef<any>(null)
   const sceneRef = useRef<any>(null)
   const initializedRef = useRef<boolean>(false)
+  const scoredBlocksRef = useRef<Set<number>>(new Set())
 
   useEffect(() => {
     socketRef.current = socket
   }, [socket])
 
   useEffect(() => {
-    if (settings.gameMode === 'SOLO_PRACTICE') return
+    if (settings.gameMode === 'SOLO_PRACTICE' || settings.gameMode === 'SOLO_COMPETITOR') return
     if (!physicsState || blocksRef.current.length === 0) return
     const count = Math.min(blocksRef.current.length, physicsState.length)
     for (let i = 0; i < count; i++) {
@@ -234,6 +250,7 @@ export default function Game({ settings, onReset }: GameProps) {
     loader: any,
     table_material: any,
     block_material: any,
+    locked_block_material: any,
     intersect_plane: any,
     selected_block: any = null,
     mouse_position: any,
@@ -293,10 +310,41 @@ export default function Game({ settings, onReset }: GameProps) {
     scene.addEventListener('update', function () {
       // For solo practice mode, we handle local physics
       // For server modes, we rely on server updates
-      if (settings.gameMode === 'SOLO_PRACTICE') {
+      if (settings.gameMode === 'SOLO_PRACTICE' || settings.gameMode === 'SOLO_COMPETITOR') {
         // Continue local physics simulation
         // console.log('Physics update tick')
         scene.simulate()
+
+        // Competitor Mode Logic: Scoring and Collapse
+        if (settings.gameMode === 'SOLO_COMPETITOR' && !gameOver) {
+          let groundBlocks = 0
+
+          blocksRef.current.forEach((block, index) => {
+            // Check Scoring: Block moved far from center
+            const dist = Math.sqrt(block.position.x * block.position.x + block.position.z * block.position.z)
+
+            if (dist > 8 && !scoredBlocksRef.current.has(block.id)) {
+              scoredBlocksRef.current.add(block.id)
+              setScore(prev => prev + 1)
+              setTimeLeft(30) // Reset timer
+
+              // Optional: Make scored block disappear or ghost
+              // block.visible = false // Or just leave it as debris
+            }
+
+            // Check Collapse: Block near ground but inside tower area
+            if (block.position.y < 2 && dist < 6) {
+              groundBlocks++
+            }
+          })
+
+          // Base has 3 blocks. If > 5 blocks are near ground inside tower area, it's a collapse
+          // (Allowing a couple of loose blocks to fall without ending game immediately, but 5 is safe threshold)
+          if (groundBlocks > 5) {
+            console.log('Collapse detected! Ground blocks:', groundBlocks)
+            setGameOver(true)
+          }
+        }
       }
     })
 
@@ -304,7 +352,7 @@ export default function Game({ settings, onReset }: GameProps) {
     requestAnimationFrame(render)
 
     // Enable physics simulation based on game mode
-    if (settings.gameMode === 'SOLO_PRACTICE') {
+    if (settings.gameMode === 'SOLO_PRACTICE' || settings.gameMode === 'SOLO_COMPETITOR') {
       console.log('Starting local physics simulation for solo practice')
       scene.simulate()
     }
@@ -359,13 +407,24 @@ export default function Game({ settings, onReset }: GameProps) {
     const plywoodTexture = loader.load('/images/plywood.jpg', undefined, undefined, (err: any) => {
       console.error('Error loading plywood texture:', err)
     })
+
+    // Standard Block Material
     block_material = Physijs.createMaterial(
       new THREE.MeshLambertMaterial({ map: plywoodTexture }),
-      physicsConfig.friction, // friction
-      physicsConfig.restitution // restitution
+      physicsConfig.friction,
+      physicsConfig.restitution
     )
     block_material.map.wrapS = block_material.map.wrapT = THREE.RepeatWrapping
     block_material.map.repeat.set(1, .5)
+
+    // Locked Block Material (Darker/Reddish) for top layers
+    locked_block_material = Physijs.createMaterial(
+      new THREE.MeshLambertMaterial({ map: plywoodTexture, color: 0xffaaaa }), // Red tint
+      physicsConfig.friction,
+      physicsConfig.restitution
+    )
+    locked_block_material.map.wrapS = locked_block_material.map.wrapT = THREE.RepeatWrapping
+    locked_block_material.map.repeat.set(1, .5)
 
     // Table
     table = new Physijs.BoxMesh(
@@ -378,7 +437,7 @@ export default function Game({ settings, onReset }: GameProps) {
     table.receiveShadow = true
     scene.add(table)
 
-    createTower()
+    createTower(block_material, locked_block_material)
 
     intersect_plane = new THREE.Mesh(
       new THREE.PlaneGeometry(150, 150),
@@ -400,7 +459,7 @@ export default function Game({ settings, onReset }: GameProps) {
     renderer.render(scene, camera)
   }
 
-  const createTower = function () {
+  const createTower = function (normalMat?: any, lockedMat?: any) {
     const block_length = 6, block_height = 1, block_width = 1.5, block_offset = 2
     const block_geometry = new THREE.BoxGeometry(block_length, block_height, block_width)
     const sc = sceneRef.current
@@ -409,11 +468,19 @@ export default function Game({ settings, onReset }: GameProps) {
       return
     }
 
+    // Use cached materials if not provided (for reset)
+    const mat = normalMat || block_material
+    const lMat = lockedMat || locked_block_material || mat
+
     const physicsConfig = getPhysicsConfig(settings.difficulty)
 
     for (let i = 0; i < 16; i++) {
+      // Determine if this layer is locked (top 2 layers: 14 and 15)
+      const isLocked = settings.gameMode === 'SOLO_COMPETITOR' && i >= 14
+      const currentMat = isLocked ? lMat : mat
+
       for (let j = 0; j < 3; j++) {
-        const block = new Physijs.BoxMesh(block_geometry, block_material, physicsConfig.mass)
+        const block = new Physijs.BoxMesh(block_geometry, currentMat, physicsConfig.mass)
         block.position.y = (block_height / 2) + block_height * i
         if (i % 2 === 0) {
           block.rotation.y = Math.PI / 2.01
@@ -426,6 +493,9 @@ export default function Game({ settings, onReset }: GameProps) {
 
         // Apply damping
         block.setDamping(physicsConfig.damping, physicsConfig.damping)
+
+        // Store layer info for Competitor Mode
+        block.userData = { layer: i, isLocked }
 
         sc.add(block)
         blocksRef.current.push(block)
@@ -443,7 +513,13 @@ export default function Game({ settings, onReset }: GameProps) {
     selected_block = null
     createTower()
     setFallenCount(0)
-    if (settings.gameMode === 'SOLO_PRACTICE') {
+    setScore(0)
+    setGameOver(false)
+    setGameWon(false)
+    setTimeLeft(30)
+    scoredBlocksRef.current.clear()
+
+    if (settings.gameMode === 'SOLO_PRACTICE' || settings.gameMode === 'SOLO_COMPETITOR') {
       sc.simulate()
     }
   }
@@ -470,7 +546,7 @@ export default function Game({ settings, onReset }: GameProps) {
 
     const handleInputStart = function (evt: MouseEvent | TouchEvent) {
       // Spectator Check
-      if (isSpectator || gameState !== 'ACTIVE') return
+      if (isSpectator || gameState !== 'ACTIVE' || gameOver) return
 
       // Prevent default to stop scrolling on touch devices
       if (evt.type === 'touchstart') {
@@ -489,7 +565,15 @@ export default function Game({ settings, onReset }: GameProps) {
       const intersections = ray.intersectObjects(blocksRef.current)
 
       if (intersections.length > 0) {
-        selected_block = intersections[0].object
+        const block = intersections[0].object
+
+        // Competitor Mode: Prevent selecting top 2 levels (Layers 14 and 15)
+        if (settings.gameMode === 'SOLO_COMPETITOR' && block.userData?.layer >= 14) {
+          console.log('Cannot move blocks from top 2 levels!')
+          return
+        }
+
+        selected_block = block
         intersect_plane.position.y = selected_block.position.y
         const planeHit = ray.intersectObject(intersect_plane)
         if (planeHit.length > 0) {
@@ -516,7 +600,7 @@ export default function Game({ settings, onReset }: GameProps) {
 
         const blockIndex = blocksRef.current.indexOf(selected_block)
 
-        if (settings.gameMode === 'SOLO_PRACTICE') {
+        if (settings.gameMode === 'SOLO_PRACTICE' || settings.gameMode === 'SOLO_COMPETITOR') {
           if (typeof selected_block.applyCentralImpulse === 'function') {
             selected_block.applyCentralImpulse(impulse)
           } else {
@@ -575,7 +659,7 @@ export default function Game({ settings, onReset }: GameProps) {
     <div className="relative w-full h-full">
       {/* Game UI Overlay */}
       <GameUI
-        gameState={gameState}
+        gameState={gameOver ? 'ENDED' : gameState}
         potSize={potSize}
         timeLeft={timeLeft}
         players={players}
@@ -586,7 +670,9 @@ export default function Game({ settings, onReset }: GameProps) {
           settings.gameMode === 'SINGLE_VS_AI' ? (settings.aiOpponentCount || 1) + 1 : 1}
         difficulty={settings.difficulty}
         stake={settings.stake}
-        isPractice={settings.gameMode === 'SOLO_PRACTICE'}
+        isPractice={settings.gameMode === 'SOLO_PRACTICE' || settings.gameMode === 'SOLO_COMPETITOR'}
+        score={score}
+        highScore={highScore}
         onJoin={() => {
           // Try contract first, fallback to mock
           try {
@@ -597,7 +683,7 @@ export default function Game({ settings, onReset }: GameProps) {
           // Server will update state via WebSocket
         }}
         onReload={() => {
-          if (settings.gameMode === 'SOLO_PRACTICE') {
+          if (settings.gameMode === 'SOLO_PRACTICE' || settings.gameMode === 'SOLO_COMPETITOR') {
             resetTower()
           } else {
             contractReload()
@@ -609,6 +695,43 @@ export default function Game({ settings, onReset }: GameProps) {
           // TODO: Emit vote to server
         }}
       />
+
+      {/* Game Over Overlay for Competitor Mode */}
+      {gameOver && settings.gameMode === 'SOLO_COMPETITOR' && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+          <div className="bg-gray-900 border border-white/20 p-8 rounded-2xl text-center max-w-md w-full">
+            <h2 className="text-4xl font-bold text-white mb-2">Game Over</h2>
+            <p className="text-gray-400 mb-6">The tower collapsed or time ran out!</p>
+
+            <div className="bg-white/5 rounded-xl p-6 mb-8">
+              <div className="text-sm text-gray-400 uppercase tracking-wider mb-1">Final Score</div>
+              <div className="text-6xl font-bold text-yellow-400">{score}</div>
+              <div className="text-sm text-gray-500 mt-2">Difficulty: {settings.difficulty}</div>
+            </div>
+
+            <div className="space-y-3">
+              <button
+                onClick={() => submitScore(settings.difficulty, score)}
+                disabled={isSubmitting || isConfirmingScore || isScoreConfirmed}
+                className={`w-full font-bold py-3 rounded-lg transition-colors ${isScoreConfirmed
+                  ? 'bg-green-600 text-white cursor-default'
+                  : 'bg-yellow-600 hover:bg-yellow-500 text-white'
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                {isSubmitting ? 'Check Wallet...' :
+                  isConfirmingScore ? 'Confirming...' :
+                    isScoreConfirmed ? 'Score Submitted!' : 'Submit Score (On-Chain)'}
+              </button>
+              <button
+                onClick={resetTower}
+                className="w-full bg-white/10 hover:bg-white/20 text-white font-semibold py-3 rounded-lg transition-colors"
+              >
+                Try Again
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Spectator Label */}
       {isSpectator && (

@@ -17,7 +17,7 @@ export interface PhysicsBlockState {
 }
 
 export interface GameSettingsConfig {
-    gameMode: 'SOLO_PRACTICE' | 'SINGLE_VS_AI' | 'MULTIPLAYER'
+    gameMode: 'SOLO_PRACTICE' | 'SOLO_COMPETITOR' | 'SINGLE_VS_AI' | 'MULTIPLAYER'
     playerCount: number
     aiOpponentCount?: number
     difficulty: 'EASY' | 'MEDIUM' | 'HARD'

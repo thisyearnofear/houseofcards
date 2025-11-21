@@ -22,6 +22,8 @@ interface GameUIProps {
     difficulty?: string
     stake?: number
     isPractice?: boolean
+    score?: number
+    highScore?: number
     onJoin: () => void
     onReload: () => void
     onVote: (split: boolean) => void
@@ -39,10 +41,24 @@ export default function GameUI({
     difficulty = 'MEDIUM',
     stake = 1,
     isPractice = false,
+    score,
+    highScore = 0,
     onJoin,
     onReload,
     onVote
 }: GameUIProps) {
+
+    const [scoreJuice, setScoreJuice] = React.useState(false)
+    const prevScoreRef = React.useRef(score)
+
+    React.useEffect(() => {
+        if (score !== undefined && score > (prevScoreRef.current || 0)) {
+            setScoreJuice(true)
+            const timer = setTimeout(() => setScoreJuice(false), 500)
+            return () => clearTimeout(timer)
+        }
+        prevScoreRef.current = score
+    }, [score])
 
     const formatAddress = (addr: string) => {
         return addr.slice(0, 6) + '...' + addr.slice(-4)
@@ -60,14 +76,31 @@ export default function GameUI({
                         <div className="text-xs text-gray-400 uppercase tracking-wider font-bold">Pot Size</div>
                         <div className="text-2xl font-mono text-green-400">${potSize.toFixed(2)} USDC</div>
                     </div>
+
+                    {/* Score Display for Competitor Mode */}
+                    {score !== undefined && (
+                        <div className="flex gap-4">
+                            <div className={`bg-black/40 backdrop-blur-md border border-white/10 rounded-xl p-4 text-white relative transition-transform duration-200 ${scoreJuice ? 'scale-110 border-yellow-400/50' : ''}`}>
+                                <div className="text-xs text-gray-400 uppercase tracking-wider font-bold">Score</div>
+                                <div className="text-2xl font-mono text-yellow-400 flex items-center gap-2">
+                                    {score}
+                                    {scoreJuice && <span className="text-sm text-yellow-200 animate-bounce absolute -right-2 -top-2">+1</span>}
+                                </div>
+                            </div>
+                            <div className="bg-black/40 backdrop-blur-md border border-white/10 rounded-xl p-4 text-white opacity-80">
+                                <div className="text-xs text-gray-400 uppercase tracking-wider font-bold">Best</div>
+                                <div className="text-2xl font-mono text-gray-300">{Math.max(score || 0, highScore)}</div>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <div className="flex flex-col gap-2 items-end">
                     <div className="bg-black/40 backdrop-blur-md border border-white/10 rounded-xl p-4 text-white text-right">
                         <div className="text-xs text-gray-400 uppercase tracking-wider font-bold">Status</div>
                         <div className={`text-xl font-bold ${gameState === 'ACTIVE' ? 'text-blue-400' :
-                                gameState === 'VOTING' ? 'text-yellow-400' :
-                                    gameState === 'ENDED' ? 'text-red-400' : 'text-white'
+                            gameState === 'VOTING' ? 'text-yellow-400' :
+                                gameState === 'ENDED' ? 'text-red-400' : 'text-white'
                             }`}>
                             {gameState === 'WAITING' && 'Waiting for Players'}
                             {gameState === 'ACTIVE' && 'Game Active'}
@@ -97,10 +130,17 @@ export default function GameUI({
 
             {/* Center: Timer (only when active) */}
             {gameState === 'ACTIVE' && (
-                <div className="absolute top-24 left-1/2 -translate-x-1/2 pointer-events-none">
-                    <div className={`text-4xl font-black drop-shadow-lg ${timeLeft <= 10 ? 'text-red-500 animate-pulse' : 'text-white'
+                <div className="absolute top-24 left-1/2 -translate-x-1/2 pointer-events-none flex flex-col items-center gap-2">
+                    <div className={`text-4xl font-black drop-shadow-lg transition-colors duration-300 ${timeLeft <= 10 ? 'text-red-500 animate-pulse' : 'text-white'
                         }`}>
                         {timeLeft}s
+                    </div>
+                    {/* Timer Bar */}
+                    <div className="w-64 h-2 bg-black/50 rounded-full overflow-hidden backdrop-blur-sm border border-white/10">
+                        <div
+                            className={`h-full transition-all duration-1000 ease-linear ${timeLeft <= 10 ? 'bg-red-500' : 'bg-white'}`}
+                            style={{ width: `${(timeLeft / 30) * 100}%` }}
+                        />
                     </div>
                 </div>
             )}

@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 
 export interface GameSettingsConfig {
-  gameMode: 'SOLO_PRACTICE' | 'SINGLE_VS_AI' | 'MULTIPLAYER'
+  gameMode: 'SOLO_PRACTICE' | 'SOLO_COMPETITOR' | 'SINGLE_VS_AI' | 'MULTIPLAYER'
   playerCount: number
   aiOpponentCount?: number
   difficulty: 'EASY' | 'MEDIUM' | 'HARD'
@@ -15,7 +15,7 @@ interface GameSettingsProps {
 }
 
 export default function GameSettings({ onStart }: GameSettingsProps) {
-  const [gameMode, setGameMode] = useState<'SOLO_PRACTICE' | 'SINGLE_VS_AI' | 'MULTIPLAYER'>('SOLO_PRACTICE')
+  const [gameMode, setGameMode] = useState<'SOLO_PRACTICE' | 'SOLO_COMPETITOR' | 'SINGLE_VS_AI' | 'MULTIPLAYER'>('SOLO_PRACTICE')
   const [playerCount, setPlayerCount] = useState(2)
   const [aiOpponentCount, setAiOpponentCount] = useState(1)
   const [difficulty, setDifficulty] = useState<'EASY' | 'MEDIUM' | 'HARD'>('MEDIUM')
@@ -24,10 +24,10 @@ export default function GameSettings({ onStart }: GameSettingsProps) {
   const handleStart = () => {
     const settings: GameSettingsConfig = {
       gameMode,
-      playerCount: gameMode === 'SOLO_PRACTICE' ? 1 : playerCount,
+      playerCount: (gameMode === 'SOLO_PRACTICE' || gameMode === 'SOLO_COMPETITOR') ? 1 : playerCount,
       aiOpponentCount: gameMode === 'SINGLE_VS_AI' ? aiOpponentCount : undefined,
       difficulty,
-      stake: gameMode === 'SOLO_PRACTICE' ? 0 : stake
+      stake: (gameMode === 'SOLO_PRACTICE' || gameMode === 'SOLO_COMPETITOR') ? 0 : stake
     }
     onStart(settings)
   }
@@ -36,6 +36,8 @@ export default function GameSettings({ onStart }: GameSettingsProps) {
     switch (gameMode) {
       case 'SOLO_PRACTICE':
         return 'Practice your skills with the physics engine. Reset tower anytime.'
+      case 'SOLO_COMPETITOR':
+        return 'Race against the clock! Remove blocks to score points. Top 2 levels are locked.'
       case 'SINGLE_VS_AI':
         return 'Play against computer opponents with configurable difficulty.'
       case 'MULTIPLAYER':
@@ -46,7 +48,9 @@ export default function GameSettings({ onStart }: GameSettingsProps) {
   const getPlayerDisplay = () => {
     switch (gameMode) {
       case 'SOLO_PRACTICE':
-        return '1 Player (Solo Practice)'
+        return '1 Player (Practice)'
+      case 'SOLO_COMPETITOR':
+        return '1 Player (Competitor)'
       case 'SINGLE_VS_AI':
         return `1 Human vs ${aiOpponentCount} AI`
       case 'MULTIPLAYER':
@@ -69,7 +73,8 @@ export default function GameSettings({ onStart }: GameSettingsProps) {
           <label className="block text-white font-semibold mb-4">Game Mode</label>
           <div className="grid gap-3">
             {([
-              { key: 'SOLO_PRACTICE', title: 'Solo Practice', desc: 'Just you and the physics engine', icon: '🎯', disabled: false },
+              { key: 'SOLO_PRACTICE', title: 'Solo Practice', desc: 'Relaxed physics playground', icon: '🎯', disabled: false },
+              { key: 'SOLO_COMPETITOR', title: 'Solo Competitor', desc: 'Ranked time-attack mode', icon: '🏆', disabled: false },
               { key: 'SINGLE_VS_AI', title: 'Single vs AI', desc: 'Challenge computer opponents', icon: '🤖', disabled: isProduction },
               { key: 'MULTIPLAYER', title: 'Multiplayer', desc: 'Play with other humans', icon: '👥', disabled: isProduction }
             ] as const).map((mode) => (
@@ -154,8 +159,8 @@ export default function GameSettings({ onStart }: GameSettingsProps) {
               </div>
             )}
 
-            {/* Stake Amount (not for Solo Practice) */}
-            {gameMode !== 'SOLO_PRACTICE' && (
+            {/* Stake Amount (not for Solo modes) */}
+            {gameMode !== 'SOLO_PRACTICE' && gameMode !== 'SOLO_COMPETITOR' && (
               <div>
                 <label className="block text-white font-semibold mb-3">
                   Stake per Player: <span className="text-green-400">{stake} USDC</span>
@@ -208,10 +213,12 @@ export default function GameSettings({ onStart }: GameSettingsProps) {
               <h3 className="text-white font-bold mb-4">Game Summary</h3>
               <div className="text-gray-300 space-y-2">
                 <p>🎮 <strong>{getPlayerDisplay()}</strong></p>
-                {gameMode === 'SOLO_PRACTICE' ? (
+                {gameMode === 'SOLO_PRACTICE' || gameMode === 'SOLO_COMPETITOR' ? (
                   <>
-                    <p>Free practice mode</p>
-                    <p className="text-purple-400">No stakes, no limits</p>
+                    <p>{gameMode === 'SOLO_PRACTICE' ? 'Free practice mode' : 'Ranked time-attack'}</p>
+                    <p className="text-purple-400">
+                      {gameMode === 'SOLO_PRACTICE' ? 'No stakes, no limits' : 'Compete for high score'}
+                    </p>
                   </>
                 ) : (
                   <>
