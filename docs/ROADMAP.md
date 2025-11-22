@@ -1,4 +1,4 @@
-# House of Cards - Product Roadmap
+# Agnej - Product Roadmap
 
 ## Vision
 An infinite, multiplayer, blockchain-based physics game where players compete to remove blocks from a stack without causing it to collapse. Inspired by Jenga meets Chess.com meets DeFi.

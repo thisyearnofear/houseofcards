@@ -10,8 +10,8 @@
 
 ```bash
 # Clone and install
-git clone https://github.com/thisyearnofear/houseofcards.git
-cd houseofcards
+git clone https://github.com/thisyearnofear/agnej.git
+cd agnej
 
 # Frontend dependencies
 npm install

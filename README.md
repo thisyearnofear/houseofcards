@@ -1,4 +1,4 @@
-# House of Cards 🏗️
+# Agnej 🏗️
 
 A decentralized blockchain-based physics game. Compete in Solo Mode against the clock and global leaderboards, or join multiplayer battles where players take turns removing blocks from a 16-layer tower. Last survivor wins the pot.
 
@@ -86,7 +86,7 @@ Open [http://localhost:3000](http://localhost:3000)
 ## 📁 Project Structure
 
 ```
-houseofcards/
+agnej/
 ├── src/
 │   ├── components/      # React components
 │   │   ├── Game/        # Modular game logic

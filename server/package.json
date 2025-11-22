@@ -1,7 +1,7 @@
 {
-    "name": "houseofcards-server",
+    "name": "agnej-server",
     "version": "0.1.0",
-    "description": "Game Server for House of Cards",
+    "description": "Game Server for Agnej",
     "main": "dist/index.js",
     "scripts": {
         "build": "tsc",

@@ -9,7 +9,7 @@ import { sepolia, mainnet, lineaSepolia } from 'wagmi/chains'
 const queryClient = new QueryClient()
 
 const config = getDefaultConfig({
-  appName: 'House of Cards',
+  appName: 'Agnej',
   projectId: 'demo-project-id', // Replace with your WalletConnect project ID
   chains: [lineaSepolia, sepolia, mainnet],
   ssr: true,

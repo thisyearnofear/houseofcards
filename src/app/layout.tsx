@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Inverse Jenga - House of Cards",
-  description: "Interactive Web3 Jenga game with blockchain integration",
+  title: "Agnej - Decentralized Physics Game",
+  description: "A decentralized blockchain-based physics game. Compete in solo and multiplayer modes.",
 };
 
 export default function RootLayout({
