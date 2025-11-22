@@ -3,7 +3,7 @@ pragma solidity ^0.8.19;
 
 /**
  * @title Leaderboard
- * @notice On-chain leaderboard for House of Cards game
+ * @notice On-chain leaderboard for Agnej game
  * @dev Stores high scores with ranking support
  */
 contract Leaderboard {
