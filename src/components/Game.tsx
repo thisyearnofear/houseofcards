@@ -108,6 +108,10 @@ export default function Game({ settings, onReset, onExit }: GameProps) {
   const [score, setScore] = React.useState(0)
   const [gameOver, setGameOver] = React.useState(false)
   const [gameWon, setGameWon] = React.useState(false)
+  // Auto-show rules for solo modes
+  const [showRules, setShowRules] = React.useState(
+    settings.gameMode === 'SOLO_COMPETITOR' || settings.gameMode === 'SOLO_PRACTICE'
+  )
 
   // Sync Contract Data
   useEffect(() => {
@@ -119,7 +123,7 @@ export default function Game({ settings, onReset, onExit }: GameProps) {
   // Timer Logic
   useEffect(() => {
     let interval: NodeJS.Timeout
-    if (gameState === 'ACTIVE' && !gameOver && !gameWon) {
+    if (gameState === 'ACTIVE' && !gameOver && !gameWon && !showRules) {
       interval = setInterval(() => {
         setTimeLeft((prev) => {
           if (prev <= 1) {
@@ -140,6 +144,12 @@ export default function Game({ settings, onReset, onExit }: GameProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const socketRef = useRef<any>(null)
   const gameOverRef = useRef(false)
+  const showRulesRef = useRef(showRules)
+
+  useEffect(() => {
+    showRulesRef.current = showRules
+  }, [showRules])
+
   const blocksRef = useRef<any[]>([])
   const dragStartRef = useRef<any>(null)
   const sceneRef = useRef<any>(null)
@@ -631,7 +641,7 @@ export default function Game({ settings, onReset, onExit }: GameProps) {
 
     const handleInputStart = function (evt: MouseEvent | TouchEvent) {
       // Spectator Check
-      if (isSpectator || gameState !== 'ACTIVE' || gameOver) return
+      if (isSpectator || gameState !== 'ACTIVE' || gameOver || showRulesRef.current) return
 
       // Prevent default to stop scrolling on touch devices
       if (evt.type === 'touchstart') {
@@ -784,6 +794,7 @@ export default function Game({ settings, onReset, onExit }: GameProps) {
         isPractice={settings.gameMode === 'SOLO_PRACTICE' || settings.gameMode === 'SOLO_COMPETITOR'}
         score={score}
         highScore={highScore}
+        gameMode={settings.gameMode}
         onJoin={() => {
           // Try contract first, fallback to mock
           try {
@@ -806,6 +817,8 @@ export default function Game({ settings, onReset, onExit }: GameProps) {
           // TODO: Emit vote to server
         }}
         onExit={onExit}
+        showRules={showRules}
+        setShowRules={setShowRules}
       />
 
       {/* Game Over Overlay for Competitor Mode */}

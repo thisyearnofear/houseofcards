@@ -24,10 +24,13 @@ interface GameUIProps {
     isPractice?: boolean
     score?: number
     highScore?: number
+    gameMode?: string
     onJoin: () => void
     onReload: () => void
     onVote: (split: boolean) => void
     onExit?: () => void
+    showRules?: boolean
+    setShowRules?: (show: boolean) => void
 }
 
 export default function GameUI({
@@ -44,13 +47,23 @@ export default function GameUI({
     isPractice = false,
     score,
     highScore = 0,
+    gameMode,
     onJoin,
     onReload,
     onVote,
-    onExit
+    onExit,
+    showRules = false,
+    setShowRules
 }: GameUIProps) {
 
     const [scoreJuice, setScoreJuice] = React.useState(false)
+    // Local state fallback if not controlled
+    const [localShowRules, setLocalShowRules] = React.useState(false)
+
+    const isRulesVisible = setShowRules ? showRules : localShowRules
+    const toggleRules = () => setShowRules ? setShowRules(!showRules) : setLocalShowRules(!localShowRules)
+    const closeRules = () => setShowRules ? setShowRules(false) : setLocalShowRules(false)
+
     const prevScoreRef = React.useRef(score)
 
     React.useEffect(() => {
@@ -240,6 +253,119 @@ export default function GameUI({
                         </div>
                     )}
                 </div>
+            </div>
+            {/* Help Button & Overlay */}
+            <div className="pointer-events-auto">
+                <button
+                    onClick={toggleRules}
+                    className="absolute top-20 right-6 bg-white/10 hover:bg-white/20 text-white p-2 rounded-full backdrop-blur-md border border-white/10 transition-all z-40"
+                    title={gameMode === 'SOLO_PRACTICE' ? 'Practice Mode' : 'Tactical Briefing'}
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                </button>
+
+                {isRulesVisible && (
+                    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={closeRules}>
+                        <div className="bg-gradient-to-br from-gray-900 to-gray-800 border border-white/20 p-8 rounded-2xl max-w-md w-full shadow-2xl" onClick={e => e.stopPropagation()}>
+                            <div className="flex justify-between items-start mb-6">
+                                <h2 className="text-2xl font-bold text-white tracking-wider">
+                                    {gameMode === 'SOLO_PRACTICE' ? 'PRACTICE MODE' : 'TACTICAL BRIEFING'}
+                                </h2>
+                                <button onClick={closeRules} className="text-gray-400 hover:text-white">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                                    </svg>
+                                </button>
+                            </div>
+
+                            {gameMode === 'SOLO_PRACTICE' ? (
+                                // Practice Mode Briefing - Friendly & Exploratory
+                                <div className="space-y-6">
+                                    <div className="flex gap-4 items-start">
+                                        <div className="bg-green-500/20 p-3 rounded-lg text-green-400">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                                        </div>
+                                        <div>
+                                            <h3 className="text-white font-bold mb-1">SANDBOX MODE</h3>
+                                            <p className="text-gray-400 text-sm">Experiment freely! No time limits, no locked layers, no pressure. Perfect for learning the physics.</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-4 items-start">
+                                        <div className="bg-blue-500/20 p-3 rounded-lg text-blue-400">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                                        </div>
+                                        <div>
+                                            <h3 className="text-white font-bold mb-1">TAKE YOUR TIME</h3>
+                                            <p className="text-gray-400 text-sm"><span className="text-blue-400 font-bold">No timer!</span> Experiment with different strategies and learn how blocks interact.</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-4 items-start">
+                                        <div className="bg-purple-500/20 p-3 rounded-lg text-purple-400">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                                        </div>
+                                        <div>
+                                            <h3 className="text-white font-bold mb-1">ALL LAYERS UNLOCKED</h3>
+                                            <p className="text-gray-400 text-sm"><span className="text-purple-400 font-bold">Full access!</span> Remove blocks from any layer, including the top. Explore freely.</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4 mt-4">
+                                        <p className="text-green-300 text-sm text-center">
+                                            💡 <span className="font-bold">Tip:</span> When you're ready for a challenge, try <span className="font-bold">Solo Competitor</span> mode!
+                                        </p>
+                                    </div>
+                                </div>
+                            ) : (
+                                // Competitor Mode Briefing - Tactical & Competitive
+                                <div className="space-y-6">
+                                    <div className="flex gap-4 items-start">
+                                        <div className="bg-blue-500/20 p-3 rounded-lg text-blue-400">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                                        </div>
+                                        <div>
+                                            <h3 className="text-white font-bold mb-1">THE MISSION</h3>
+                                            <p className="text-gray-400 text-sm">Remove blocks from the tower to score points. Each removed block = 1 point.</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-4 items-start">
+                                        <div className="bg-red-500/20 p-3 rounded-lg text-red-400">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                                        </div>
+                                        <div>
+                                            <h3 className="text-white font-bold mb-1">RESTRICTED ZONES</h3>
+                                            <p className="text-gray-400 text-sm">The top 2 layers are <span className="text-red-400 font-bold">LOCKED</span>. You cannot remove blocks from these layers.</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-4 items-start">
+                                        <div className="bg-yellow-500/20 p-3 rounded-lg text-yellow-400">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                                        </div>
+                                        <div>
+                                            <h3 className="text-white font-bold mb-1">TIME LIMIT</h3>
+                                            <p className="text-gray-400 text-sm">You have <span className="text-yellow-400 font-bold">30 seconds</span> to make a move. The timer resets after each successful score.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            <button
+                                onClick={closeRules}
+                                className="w-full mt-8 bg-white/10 hover:bg-white/20 text-white font-bold py-3 rounded-xl transition-colors border border-white/10"
+                            >
+                                {gameMode === 'SOLO_PRACTICE' ? 'LET\'S EXPLORE!' : 'ACKNOWLEDGED'}
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     )
