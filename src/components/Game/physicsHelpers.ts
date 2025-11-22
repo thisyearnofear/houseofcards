@@ -1,4 +1,9 @@
-import { PhysicsConfig } from './types'
+export interface PhysicsConfig {
+    friction: number
+    restitution: number
+    mass: number
+    damping: number
+}
 
 /**
  * Load a script dynamically

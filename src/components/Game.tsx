@@ -125,6 +125,7 @@ export default function Game({ settings, onReset, onExit }: GameProps) {
           if (prev <= 1) {
             if (settings.gameMode === 'SOLO_COMPETITOR') {
               setGameOver(true)
+              gameOverRef.current = true
               return 0
             }
             return 30 // Reset for next turn (mock for other modes)
@@ -138,6 +139,7 @@ export default function Game({ settings, onReset, onExit }: GameProps) {
 
   const containerRef = useRef<HTMLDivElement>(null)
   const socketRef = useRef<any>(null)
+  const gameOverRef = useRef(false)
   const blocksRef = useRef<any[]>([])
   const dragStartRef = useRef<any>(null)
   const sceneRef = useRef<any>(null)
@@ -361,21 +363,23 @@ export default function Game({ settings, onReset, onExit }: GameProps) {
         scene.simulate()
 
         // Competitor Mode Logic: Scoring and Collapse
-        if (settings.gameMode === 'SOLO_COMPETITOR' && !gameOver) {
+        if (settings.gameMode === 'SOLO_COMPETITOR' && !gameOverRef.current) {
           blocksRef.current.forEach((block) => {
             // Check Scoring: Block moved far from center (removed from tower)
             const dist = Math.sqrt(block.position.x * block.position.x + block.position.z * block.position.z)
 
-            if (dist > 10 && !scoredBlocksRef.current.has(block.id)) {
+            // Only update score if game is NOT over
+            if (!gameOverRef.current && dist > 10 && !scoredBlocksRef.current.has(block.id)) {
               scoredBlocksRef.current.add(block.id)
               setScore(prev => prev + 1)
               setTimeLeft(30) // Reset timer
             }
 
             // Check Collapse:
-            if (block.userData?.isLocked && block.position.y < 12) {
-              // console.log('Collapse detected! Top layer fell.') // Removed debug log
+            // Only trigger if a locked (top) block has fallen significantly (e.g., near the table)
+            if (block.userData?.isLocked && block.position.y < 2) {
               setGameOver(true)
+              gameOverRef.current = true
             }
           })
         }
@@ -595,6 +599,7 @@ export default function Game({ settings, onReset, onExit }: GameProps) {
     setFallenCount(0)
     setScore(0)
     setGameOver(false)
+    gameOverRef.current = false
     setGameWon(false)
     setTimeLeft(30)
     scoredBlocksRef.current.clear()
@@ -884,8 +889,8 @@ export default function Game({ settings, onReset, onExit }: GameProps) {
                 onClick={() => submitScore(settings.difficulty, score)}
                 disabled={isSubmitting || isConfirmingScore || isScoreConfirmed}
                 className={`w-full font-bold py-3 rounded-lg transition-all transform ${isScoreConfirmed
-                    ? 'bg-green-600 text-white cursor-default'
-                    : 'bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white hover:scale-105'
+                  ? 'bg-green-600 text-white cursor-default'
+                  : 'bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white hover:scale-105'
                   } disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none`}
               >
                 {isSubmitting ? '⏳ Check Wallet...' :
